@@ -1,0 +1,44 @@
+name: iOS Build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate --spec project.yml
+      - name: Compile unsigned iOS Simulator app
+        run: |
+          set -o pipefail
+          xcodebuild -project LocalBridge.xcodeproj -scheme LocalBridge -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/Derived" CODE_SIGNING_ALLOWED=NO build | tee ios-build.log
+      - name: Package simulator app
+        if: success()
+        run: |
+          cd "$RUNNER_TEMP/Derived/Build/Products/Debug-iphonesimulator"
+          ditto -c -k --keepParent LocalBridge.app "$GITHUB_WORKSPACE/LocalBridge-simulator.zip"
+      - name: Upload app artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalBridge-iOS-Simulator
+          path: LocalBridge-simulator.zip
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalBridge-build-logs
+          path: ios-build.log
+          if-no-files-found: ignore

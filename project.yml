@@ -1,0 +1,47 @@
+name: LocalBridge
+options:
+  bundleIdPrefix: com.localbridge
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: zh-Hans
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  LocalBridge:
+    type: application
+    platform: iOS
+    sources:
+      - path: LocalBridgeApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.localbridge.ios
+        PRODUCT_NAME: LocalBridge
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    info:
+      path: LocalBridgeApp/Info.plist
+      properties:
+        CFBundleDisplayName: LocalBridge
+        NSLocalNetworkUsageDescription: "连接你主动配置的内网设备。"
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoadsInWebContent: true
+    entitlements:
+      path: LocalBridgeApp/LocalBridge.entitlements
+      properties:
+        com.apple.developer.networking.vpn.api:
+          - allow-vpn
+schemes:
+  LocalBridge:
+    build:
+      targets:
+        LocalBridge: all
+    run:
+      config: Debug
+    archive:
+      config: Release
