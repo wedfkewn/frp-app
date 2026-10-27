@@ -15,3 +15,4 @@ struct LocalBridgeApp: App {
                 .task { await vpn.reloadStatus() }
         }
     }
+}
