@@ -40,6 +40,7 @@ final class VPNController: ObservableObject {
         }
     }
     var connected: Bool { status == .connected }
+    var connecting: Bool { status == .connecting || status == .reasserting || status == .disconnecting }
 
     func reloadStatus() async {
         do {

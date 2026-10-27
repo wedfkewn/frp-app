@@ -1,37 +1,78 @@
 import SwiftUI
 
+private enum LocalTab: Hashable {
+    case devices
+    case vpn
+    case about
+}
+
 struct RootView: View {
+    @State private var tab: LocalTab = .devices
+
     var body: some View {
-        TabView {
-            ServicesView()
-                .tabItem { Label("服务", systemImage: "server.rack") }
+        TabView(selection: $tab) {
+            ServicesView(onOpenVPN: { withAnimation(BridgeStyle.spring) { tab = .vpn } })
+                .tabItem { Label("服务", systemImage: "square.stack.3d.up") }
+                .tag(LocalTab.devices)
+
             VPNSettingsView()
-                .tabItem { Label("VPN", systemImage: "network.badge.shield.half.filled") }
+                .tabItem { Label("连接", systemImage: "shield.lefthalf.filled") }
+                .tag(LocalTab.vpn)
+
             AboutView()
-                .tabItem { Label("说明", systemImage: "info.circle") }
+                .tabItem { Label("关于", systemImage: "info.circle") }
+                .tag(LocalTab.about)
         }
-        .tint(.blue)
+        .tint(BridgeStyle.tint)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 }
 
 private struct AboutView: View {
     var body: some View {
         NavigationStack {
-            List {
-                Section("工作方式") {
-                    Text("系统 IKEv2 VPN 可在主 App 切换后台后继续工作。连接后直接在 Safari 打开远端 VPN IP。")
-                    Text("127.0.0.1 转发只在本 App 前台运行时可靠；切换 Safari 后可能被系统挂起。")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    BridgeCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Image(systemName: "point.3.connected.trianglepath.dotted")
+                                .font(.system(size: 30))
+                                .foregroundStyle(BridgeStyle.tint)
+                            Text("LocalBridge")
+                                .font(.title2.bold())
+                            Text("安全连接你的远程服务")
+                                .foregroundStyle(BridgeStyle.secondary)
+                            BridgePill(text: "iOS 17+ · 自适应布局", color: BridgeStyle.tint, symbol: "iphone")
+                        }
+                    }
+
+                    BridgeCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            Label("两种连接方式", systemImage: "arrow.triangle.branch")
+                                .font(.headline)
+                            Text("VPN 模式：连接已有 IKEv2 网关后，通过 Safari 使用远端虚拟 IP。")
+                            Divider()
+                            Text("回环模式：App 前台监听 127.0.0.1，使用内置浏览器访问服务。切到后台后不保证保持监听。")
+                        }
+                    }
+
+                    BridgeCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("安全说明", systemImage: "lock.shield")
+                                .font(.headline)
+                            Text("VPN 密码保存在设备钥匙串。仅连接自己管理或经授权的服务器，并确认网关证书有效。")
+                                .foregroundStyle(BridgeStyle.secondary)
+                        }
+                    }
                 }
-                Section("安全与隐私") {
-                    Text("设备配置保存在本机，VPN 密码存放在钥匙串。")
-                    Text("请仅连接获授权的服务器，验证 IKEv2 服务器证书。")
-                }
-                Section("版本") {
-                    LabeledContent("版本", value: "MVP · IKEv2 + 前台 TCP 转发")
-                    LabeledContent("最低 iOS", value: "17")
-                }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
             }
-            .navigationTitle("关于 LocalBridge")
+            .navigationTitle("关于")
+            .bridgePageBackground()
         }
     }
 }

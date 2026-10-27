@@ -2,10 +2,17 @@ import Foundation
 import Combine
 import Network
 
-/// Foreground-only TCP relay. Binds to 127.0.0.1, never to all interfaces.
+enum LoopbackPhase: Equatable {
+    case stopped
+    case starting
+    case ready
+}
+
+/// Foreground-only TCP relay. Binds to 127.0.0.1 and reports actual listener readiness.
 @MainActor
 final class LoopbackProxy: ObservableObject {
     @Published private(set) var activeServiceID: UUID?
+    @Published private(set) var phase: LoopbackPhase = .stopped
     @Published var errorMessage: String?
 
     private let queue = DispatchQueue(label: "localbridge.loopback", qos: .userInitiated)
@@ -20,36 +27,53 @@ final class LoopbackProxy: ObservableObject {
                   let bindIP = IPv4Address("127.0.0.1") else {
                 throw LocalBridgeError.invalidConfiguration("本地端口无效")
             }
+
             let parameters = NWParameters.tcp
             parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(bindIP), port: local)
-            let listener = try NWListener(using: parameters)
-            self.listener = listener
-            listener.stateUpdateHandler = { [weak self] state in
-                if case .failed(let error) = state {
-                    Task { @MainActor [weak self] in
-                        self?.errorMessage = "本地监听失败：\(error.localizedDescription)"
-                        self?.stop()
+            let nextListener = try NWListener(using: parameters)
+            listener = nextListener
+            activeServiceID = service.id
+            phase = .starting
+
+            nextListener.stateUpdateHandler = { [weak self, weak nextListener] state in
+                Task { @MainActor [weak self, weak nextListener] in
+                    guard let self, let nextListener, self.listener === nextListener else { return }
+                    switch state {
+                    case .ready:
+                        self.phase = .ready
+                    case .failed(let error):
+                        self.errorMessage = "本地监听失败：\(error.localizedDescription)"
+                        self.stop()
+                    case .cancelled:
+                        self.stop()
+                    default:
+                        break
                     }
                 }
             }
-            listener.newConnectionHandler = { [weak self] inbound in
-                Task { @MainActor [weak self] in
-                    self?.accept(inbound, service: service)
+            nextListener.newConnectionHandler = { [weak self, weak nextListener] inbound in
+                Task { @MainActor [weak self, weak nextListener] in
+                    guard let self, self.listener === nextListener, self.phase == .ready else {
+                        inbound.cancel()
+                        return
+                    }
+                    self.accept(inbound, service: service)
                 }
             }
-            listener.start(queue: queue)
-            activeServiceID = service.id
+            nextListener.start(queue: queue)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func stop() {
-        listener?.cancel()
+        let old = listener
         listener = nil
+        activeServiceID = nil
+        phase = .stopped
+        old?.cancel()
         for session in sessions.values { session.cancel() }
         sessions.removeAll()
-        activeServiceID = nil
     }
 
     private func accept(_ inbound: NWConnection, service: ServiceEndpoint) {
@@ -72,8 +96,6 @@ final class LoopbackProxy: ObservableObject {
     }
 }
 
-/// A relay's two receive loops start only when its outbound socket is ready.
-/// To limit memory pressure, the next receive begins only after the prior send completes.
 private final class RelaySession {
     private let inbound: NWConnection
     private let outbound: NWConnection
