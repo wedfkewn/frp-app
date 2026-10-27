@@ -1,4 +1,5 @@
 name: iOS Build
+
 on:
   push:
     branches: [main]
@@ -10,35 +11,88 @@ permissions:
 
 jobs:
   build:
+    name: Build iOS simulator and unsigned device IPA
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Xcode version
         run: xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
+
       - name: Generate project
         run: xcodegen generate --spec project.yml
+
       - name: Compile unsigned iOS Simulator app
         run: |
           set -o pipefail
-          xcodebuild -project LocalBridge.xcodeproj -scheme LocalBridge -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/Derived" CODE_SIGNING_ALLOWED=NO build | tee ios-build.log
+          xcodebuild \
+            -project LocalBridge.xcodeproj \
+            -scheme LocalBridge \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/SimulatorDerived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee ios-simulator-build.log
+
       - name: Package simulator app
-        if: success()
         run: |
-          cd "$RUNNER_TEMP/Derived/Build/Products/Debug-iphonesimulator"
+          cd "$RUNNER_TEMP/SimulatorDerived/Build/Products/Debug-iphonesimulator"
           ditto -c -k --keepParent LocalBridge.app "$GITHUB_WORKSPACE/LocalBridge-simulator.zip"
-      - name: Upload app artifact
-        if: success()
+
+      - name: Upload simulator app
         uses: actions/upload-artifact@v4
         with:
           name: LocalBridge-iOS-Simulator
           path: LocalBridge-simulator.zip
+          retention-days: 14
+
+      - name: Compile unsigned iPhone device app (arm64)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project LocalBridge.xcodeproj \
+            -scheme LocalBridge \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DeviceDerived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee ios-device-build.log
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DeviceDerived/Build/Products/Release-iphoneos/LocalBridge.app"
+          test -d "$APP"
+          test -f "$APP/LocalBridge"
+          lipo -archs "$APP/LocalBridge"
+          mkdir -p "$RUNNER_TEMP/IPAPackage/Payload"
+          ditto "$APP" "$RUNNER_TEMP/IPAPackage/Payload/LocalBridge.app"
+          (cd "$RUNNER_TEMP/IPAPackage" && zip -qry "$GITHUB_WORKSPACE/LocalBridge-unsigned.ipa" Payload)
+          unzip -t "$GITHUB_WORKSPACE/LocalBridge-unsigned.ipa" > /dev/null
+          ls -lh "$GITHUB_WORKSPACE/LocalBridge-unsigned.ipa"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalBridge-iPhone-unsigned-IPA
+          path: LocalBridge-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: LocalBridge-build-logs
-          path: ios-build.log
+          path: |
+            ios-simulator-build.log
+            ios-device-build.log
           if-no-files-found: ignore
+          retention-days: 14
