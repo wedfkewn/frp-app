@@ -52,35 +52,6 @@ jobs:
           path: LocalBridge-simulator.zip
           retention-days: 14
 
-      - name: iPhone 16 Pro simulator layout smoke screenshot
-        continue-on-error: true
-        timeout-minutes: 8
-        run: |
-          set -euo pipefail
-          xcrun simctl list devices available
-          DEVICE=$(xcrun simctl list devices available | sed -nE 's/.*iPhone 16 Pro \(([0-9A-Fa-f-]{36})\).*/\1/p' | head -n 1)
-          if [[ -z "$DEVICE" ]]; then
-            echo "iPhone 16 Pro simulator not installed; skipping screenshot."
-            exit 0
-          fi
-          xcrun simctl boot "$DEVICE" || true
-          xcrun simctl bootstatus "$DEVICE" -b
-          xcrun simctl install "$DEVICE" "$RUNNER_TEMP/SimulatorDerived/Build/Products/Debug-iphonesimulator/LocalBridge.app"
-          xcrun simctl launch "$DEVICE" com.localbridge.ios
-          sleep 5
-          mkdir -p preview
-          xcrun simctl io "$DEVICE" screenshot "$GITHUB_WORKSPACE/preview/iPhone16Pro-Home.png"
-          xcrun simctl shutdown "$DEVICE" || true
-
-      - name: Upload iPhone 16 Pro layout preview
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: LocalBridge-iPhone16Pro-Preview
-          path: preview/*.png
-          retention-days: 14
-          if-no-files-found: ignore
-
       - name: Compile unsigned iPhone device app (arm64)
         run: |
           set -o pipefail
@@ -114,6 +85,35 @@ jobs:
           path: LocalBridge-unsigned.ipa
           retention-days: 14
           if-no-files-found: error
+
+      - name: iPhone 16 Pro simulator layout smoke screenshot
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available
+          DEVICE=$(xcrun simctl list devices available | sed -nE 's/.*iPhone 16 Pro \(([0-9A-Fa-f-]{36})\).*/\1/p' | head -n 1)
+          if [[ -z "$DEVICE" ]]; then
+            echo "iPhone 16 Pro simulator not installed; skipping screenshot."
+            exit 0
+          fi
+          xcrun simctl boot "$DEVICE" || true
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" "$RUNNER_TEMP/SimulatorDerived/Build/Products/Debug-iphonesimulator/LocalBridge.app"
+          xcrun simctl launch "$DEVICE" com.localbridge.ios
+          sleep 5
+          mkdir -p preview
+          xcrun simctl io "$DEVICE" screenshot "$GITHUB_WORKSPACE/preview/iPhone16Pro-Home.png"
+          xcrun simctl shutdown "$DEVICE" || true
+
+      - name: Upload iPhone 16 Pro layout preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalBridge-iPhone16Pro-Preview
+          path: preview/*.png
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Upload build logs
         if: always()
