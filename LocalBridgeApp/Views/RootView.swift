@@ -1,27 +1,29 @@
 import SwiftUI
 
 private enum LocalTab: Hashable {
-    case devices
-    case vpn
-    case about
+    case quick, ssh, devices, info
 }
 
 struct RootView: View {
-    @State private var tab: LocalTab = .devices
+    @State private var tab: LocalTab = .quick
 
     var body: some View {
         TabView(selection: $tab) {
-            ServicesView(onOpenVPN: { withAnimation(BridgeStyle.spring) { tab = .vpn } })
-                .tabItem { Label("服务", systemImage: "square.stack.3d.up") }
-                .tag(LocalTab.devices)
+            SSHQuickHomeView(configure: { withAnimation(BridgeStyle.spring) { tab = .ssh } })
+                .tabItem { Label("快捷", systemImage: "square.grid.2x2.fill") }
+                .tag(LocalTab.quick)
 
-            VPNSettingsView()
-                .tabItem { Label("连接", systemImage: "shield.lefthalf.filled") }
-                .tag(LocalTab.vpn)
+            SSHSettingsView()
+                .tabItem { Label("SSH", systemImage: "network") }
+                .tag(LocalTab.ssh)
+
+            ServicesView(onOpenVPN: { withAnimation(BridgeStyle.spring) { tab = .ssh } })
+                .tabItem { Label("服务", systemImage: "server.rack") }
+                .tag(LocalTab.devices)
 
             AboutView()
                 .tabItem { Label("关于", systemImage: "info.circle") }
-                .tag(LocalTab.about)
+                .tag(LocalTab.info)
         }
         .tint(BridgeStyle.tint)
         .toolbarBackground(.visible, for: .tabBar)
@@ -40,34 +42,32 @@ private struct AboutView: View {
                                 .foregroundStyle(BridgeStyle.tint)
                             Text("LocalBridge")
                                 .font(.title2.bold())
-                            Text("安全连接你的远程服务")
+                            Text("安全连接远程服务，快捷打开四个常用网页")
                                 .foregroundStyle(BridgeStyle.secondary)
                             BridgePill(text: "iOS 17+ · 自适应布局", color: BridgeStyle.tint, symbol: "iphone")
                         }
                     }
-
                     BridgeCard {
                         VStack(alignment: .leading, spacing: 14) {
-                            Label("两种连接方式", systemImage: "arrow.triangle.branch")
+                            Label("SSH 本地转发", systemImage: "terminal")
                                 .font(.headline)
-                            Text("VPN 模式：连接已有 IKEv2 网关后，通过 Safari 使用远端虚拟 IP。")
-                            Divider()
-                            Text("回环模式：App 前台监听 127.0.0.1，使用内置浏览器访问服务。切到后台后不保证保持监听。")
+                            Text("根据 BAT 文件，iPhone 使用 SSH 连接远端服务器并建立四个本机端口。")
+                            Text("SSH 转发依赖前台运行。切换到 Safari 或锁屏后连接可能被系统暂停，因此优先使用 App 内浏览器。")
+                                .foregroundStyle(BridgeStyle.secondary)
                         }
                     }
-
                     BridgeCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
                             Label("安全说明", systemImage: "lock.shield")
                                 .font(.headline)
-                            Text("VPN 密码保存在设备钥匙串。仅连接自己管理或经授权的服务器，并确认网关证书有效。")
+                            Text("密码仅存储在手机钥匙串，SSH 主机公钥必须事先核实。请勿将 SSH 私钥上传到 GitHub。")
                                 .foregroundStyle(BridgeStyle.secondary)
                         }
                     }
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 12)
-                .padding(.bottom, 28)
+                .padding(.bottom, 30)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }

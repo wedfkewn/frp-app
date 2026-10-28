@@ -172,7 +172,7 @@ struct ServiceDetailView: View {
     }
 }
 
-private struct LocalBrowserScreen: View {
+struct LocalBrowserScreen: View {
     let url: URL
     let title: String
 
